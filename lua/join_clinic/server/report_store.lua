@@ -56,10 +56,23 @@ local function resolveSid(arg)
 	local i = 1
 	while players[i] do
 		local ply = players[i]
+		if string.lower(ply:Nick()) == lower then
+			return ply:SteamID64()
+		end
+		i = i + 1
+	end
+	i = 1
+	while players[i] do
+		local ply = players[i]
 		if string.find(string.lower(ply:Nick()), lower, 1, true) then
 			return ply:SteamID64()
 		end
 		i = i + 1
+	end
+	for sid, report in pairs(last) do
+		if string.lower(report.nick) == lower then
+			return sid
+		end
 	end
 	for sid, report in pairs(last) do
 		if string.find(string.lower(report.nick), lower, 1, true) then

@@ -28,17 +28,21 @@ function JoinClinic.IngestCritical(rows)
 	local i = 1
 	while rows[i] do
 		local row = rows[i]
-		local kind = row.kind
-		local id = row.id
-		local label = row.label
-		if kind == nil and row[1] ~= nil then
-			kind = row[1]
-			id = row[2]
-			label = row[3]
-		end
-		local ok, err = pcall(JoinClinic.AddExpected, kind, id, label)
-		if not ok then
-			ErrorNoHalt("[JoinClinic] critical_assets row " .. tostring(i) .. ": " .. tostring(err) .. "\n")
+		if type(row) ~= "table" then
+			ErrorNoHalt("[JoinClinic] critical_assets row " .. tostring(i) .. ": expected table\n")
+		else
+			local kind = row.kind
+			local id = row.id
+			local label = row.label
+			if kind == nil and row[1] ~= nil then
+				kind = row[1]
+				id = row[2]
+				label = row[3]
+			end
+			local ok, err = pcall(JoinClinic.AddExpected, kind, id, label)
+			if not ok then
+				ErrorNoHalt("[JoinClinic] critical_assets row " .. tostring(i) .. ": " .. tostring(err) .. "\n")
+			end
 		end
 		i = i + 1
 	end
@@ -61,9 +65,11 @@ end
 function JoinClinic.SendExpected(ply)
 	local list = JoinClinic.ListExpected()
 	if #list > 8192 then
-		ErrorNoHalt("[JoinClinic] expected registry has " .. tostring(#list) .. " rows; sending first 8192\n")
+		-- List is sorted asset < fastdl < workshop. Drop from the front so
+		-- Workshop IDs (most useful for tickets) are kept.
+		ErrorNoHalt("[JoinClinic] expected registry has " .. tostring(#list) .. " rows; keeping last 8192 (workshop-heavy)\n")
 		while #list > 8192 do
-			list[#list] = nil
+			table.remove(list, 1)
 		end
 	end
 	JoinClinic.SendChunked(JoinClinic.NET_EXPECTED, { items = list }, ply)
@@ -108,9 +114,18 @@ concommand.Add("joinclinic_expected", function(ply)
 	end
 end)
 
+local lastRequestAt = {}
+local REQUEST_COOLDOWN = 2
+
 net.Receive(JoinClinic.NET_REQUEST, function(_, ply)
 	if not IsValid(ply) then
 		return
 	end
+	local sid = ply:SteamID64()
+	local now = CurTime()
+	if now - (lastRequestAt[sid] or 0) < REQUEST_COOLDOWN then
+		return
+	end
+	lastRequestAt[sid] = now
 	JoinClinic.SendExpected(ply)
 end)

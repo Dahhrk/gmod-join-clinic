@@ -6,6 +6,9 @@ function JoinClinic.OpenPanel(report)
 		JoinClinic.Frame:Remove()
 	end
 
+	local counts = report.counts or { ok = 0, bad = 0 }
+	local results = report.results or {}
+
 	local frame = vgui.Create("DFrame")
 	JoinClinic.Frame = frame
 	frame:SetTitle("Join Clinic")
@@ -19,10 +22,10 @@ function JoinClinic.OpenPanel(report)
 	sub:DockMargin(8, 4, 8, 4)
 	sub:SetWrap(true)
 	sub:SetTextColor(Color(220, 220, 220))
-	if #report.results == 0 then
+	if #results == 0 then
 		sub:SetText("Expected registry is empty. Join Clinic wrapped resource.Add* too late, or nothing was added.")
 	else
-		sub:SetText("map " .. report.map .. "   player " .. report.nick .. " (" .. report.steamid64 .. ")   ok " .. tostring(report.counts.ok) .. " / bad " .. tostring(report.counts.bad))
+		sub:SetText("map " .. tostring(report.map or "") .. "   player " .. tostring(report.nick or "") .. " (" .. tostring(report.steamid64 or "") .. ")   ok " .. tostring(counts.ok) .. " / bad " .. tostring(counts.bad))
 	end
 
 	local btn = vgui.Create("DButton", frame)
@@ -44,8 +47,8 @@ function JoinClinic.OpenPanel(report)
 	list:AddColumn("Detail")
 
 	local i = 1
-	while report.results[i] do
-		local row = report.results[i]
+	while results[i] do
+		local row = results[i]
 		list:AddLine(row.item.kind, row.item.id, row.status, row.detail)
 		i = i + 1
 	end

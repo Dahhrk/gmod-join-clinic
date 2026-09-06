@@ -39,7 +39,7 @@ JoinReport
 
 ## Net
 
-Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are spaced by `JoinClinic.CHUNK_GAP` (default 0.05s) so large collections do not flood one tick. A newer send on the same channel cancels in-flight staggered chunks. GMod's per-message cap is 65,533 bytes. Registry and report rows hard-cap at 8192 (error or truncate with a console warning — never silent crop of a stored report).
+Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are spaced by `JoinClinic.CHUNK_GAP` (default 0.05s) so large collections do not flood one tick. A newer send on the same channel cancels in-flight staggered chunks. GMod's per-message cap is 65,533 bytes. Registry and report rows hard-cap at 8192. Oversized **reports** error on parse. Oversized **expected** sends drop from the front of the sorted list (asset/fastdl first) so Workshop IDs are kept.
 
 ## Surfaces
 

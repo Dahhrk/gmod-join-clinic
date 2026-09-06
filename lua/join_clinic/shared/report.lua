@@ -150,16 +150,18 @@ function JoinClinic.MakeResult(item, status, detail)
 end
 
 function JoinClinic.FormatReport(report)
+	local counts = report.counts or { ok = 0, bad = 0 }
 	local lines = {
 		"Join Clinic",
-		"map " .. report.map,
-		"player " .. report.nick .. " (" .. report.steamid64 .. ")",
-		"ok " .. tostring(report.counts.ok) .. " / bad " .. tostring(report.counts.bad),
+		"map " .. tostring(report.map or ""),
+		"player " .. tostring(report.nick or "") .. " (" .. tostring(report.steamid64 or "") .. ")",
+		"ok " .. tostring(counts.ok) .. " / bad " .. tostring(counts.bad),
 		""
 	}
+	local results = report.results or {}
 	local i = 1
-	while report.results[i] do
-		local row = report.results[i]
+	while results[i] do
+		local row = results[i]
 		lines[#lines + 1] = row.item.kind .. " " .. row.item.id .. " " .. row.status .. " " .. (row.detail or "")
 		i = i + 1
 	end
