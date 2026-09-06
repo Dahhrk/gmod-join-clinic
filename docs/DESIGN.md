@@ -50,7 +50,7 @@ Expected list and reports go as compressed JSON, chunked at 60 KB. GMod's per-me
 ## Layout
 
 ```
-lua/autorun/aaa_join_clinic_init.lua   -- AddCSLuaFile + includes only
+lua/autorun/00_join_clinic.lua         -- AddCSLuaFile + includes only (early load)
 lua/join_clinic/
   shared/report.lua                    -- JoinReport shape + helpers
   shared/net.lua                       -- chunked JSON net
