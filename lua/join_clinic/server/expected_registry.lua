@@ -80,12 +80,17 @@ end
 function JoinClinic.SendExpected(ply)
 	local list = JoinClinic.ListExpected()
 	if #list > 8192 then
-		-- List is sorted asset < fastdl < workshop. Drop from the front so
-		-- Workshop IDs (most useful for tickets) are kept.
+		-- List is sorted asset < fastdl < workshop. Keep the last 8192 (workshop-heavy).
 		ErrorNoHalt("[JoinClinic] expected registry has " .. tostring(#list) .. " rows; keeping last 8192 (workshop-heavy)\n")
-		while #list > 8192 do
-			table.remove(list, 1)
+		local keep = {}
+		local startAt = #list - 8192 + 1
+		local j = 1
+		while startAt <= #list do
+			keep[j] = list[startAt]
+			j = j + 1
+			startAt = startAt + 1
 		end
+		list = keep
 	end
 	JoinClinic.SendChunked(JoinClinic.NET_EXPECTED, { items = list }, ply)
 end
@@ -116,7 +121,7 @@ local function dumpLine(ply, line)
 end
 
 concommand.Add("joinclinic_expected", function(ply)
-	if IsValid(ply) and not ply:IsSuperAdmin() then
+	if IsValid(ply) and not JoinClinic.CanInspect(ply, ply) then
 		return
 	end
 	local list = JoinClinic.ListExpected()

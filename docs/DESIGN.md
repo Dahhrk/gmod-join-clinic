@@ -44,8 +44,11 @@ Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are sp
 ## Surfaces
 
 - Player: `joinclinic` or auto-open when `counts.bad > 0`
-- Staff: `joinclinic_inspect <name|steamid>`
+- Staff: `joinclinic_inspect <name|steamid>` (SuperAdmin, CAMI `JoinClinic_Inspect`, or `JoinClinic_CanInspect` hook)
+- Notify: chat line when `counts.bad > 0` (SuperAdmin, CAMI `JoinClinic_Notify`, or `JoinClinic_CanNotifyStaff` hook)
 - Console: last report printed as copyable text
+
+Owner ops: [OPS.md](OPS.md).
 
 ## Layout
 

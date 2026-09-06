@@ -1,3 +1,12 @@
+local STATUS_COLOR = {
+	ok = Color(140, 200, 140),
+	missing = Color(220, 120, 120),
+	not_downloaded = Color(220, 120, 120),
+	not_mounted = Color(220, 170, 100),
+	http_fail = Color(220, 120, 120),
+	error_texture = Color(220, 120, 120)
+}
+
 function JoinClinic.OpenPanel(report)
 	if not report then
 		return
@@ -49,7 +58,11 @@ function JoinClinic.OpenPanel(report)
 	local i = 1
 	while results[i] do
 		local row = results[i]
-		list:AddLine(row.item.kind, row.item.id, row.status, row.detail)
+		local line = list:AddLine(row.item.kind, row.item.id, row.status, row.detail)
+		local col = STATUS_COLOR[row.status]
+		if col then
+			line:SetTextColor(col)
+		end
 		i = i + 1
 	end
 end

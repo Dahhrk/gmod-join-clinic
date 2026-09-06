@@ -24,7 +24,12 @@ local function fastdlUrl(base, path)
 	base = string.gsub(base, "/+$", "")
 	path = string.gsub(tostring(path), "^/+", "")
 	path = string.gsub(path, "\\", "/")
-	path = string.gsub(path, " ", "%%20")
+	-- Encode each path segment; keep slashes as separators.
+	path = string.gsub(path, "([^/]+)", function(seg)
+		return string.gsub(seg, "([^%w%-%._~])", function(c)
+			return string.format("%%%02X", string.byte(c))
+		end)
+	end)
 	return base .. "/" .. path
 end
 
@@ -139,6 +144,17 @@ local function runAudit(items)
 			local saw200 = false
 			local notes = {}
 
+			local function decide(timeout)
+				local detail = "GAME missing; HTTP " .. table.concat(notes, " ")
+				if timeout then
+					detail = detail .. " timeout"
+				end
+				if saw200 then
+					return "missing", detail
+				end
+				return "http_fail", detail
+			end
+
 			local function finish(status, detail)
 				if finished then
 					return
@@ -161,12 +177,8 @@ local function runAudit(items)
 				if left > 0 then
 					return
 				end
-				local detail = "GAME missing; HTTP " .. table.concat(notes, " ")
-				if saw200 then
-					finish("missing", detail)
-					return
-				end
-				finish("http_fail", detail)
+				local status, detail = decide(false)
+				finish(status, detail)
 			end
 
 			local url = fastdlUrl(base, gamePath(item.id))
@@ -189,12 +201,8 @@ local function runAudit(items)
 				if finished then
 					return
 				end
-				local detail = "GAME missing; HTTP " .. table.concat(notes, " ") .. " timeout"
-				if saw200 then
-					finish("missing", detail)
-					return
-				end
-				finish("http_fail", detail)
+				local status, detail = decide(true)
+				finish(status, detail)
 			end)
 		end
 		httpPump()

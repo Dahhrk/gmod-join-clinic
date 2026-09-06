@@ -40,11 +40,13 @@ Workshop upload: pack with [gmpublisher](https://github.com/WilliamVenner/gmpubl
 
 ## Roleplay / community servers
 
-Drop this addon on any server that already uses `resource.AddWorkshop` / FastDL. After a bad join, staff run `joinclinic_inspect <nick>` and paste the report into the support thread. The row names the Workshop ID or FastDL file.
+Drop this addon on any server that already uses `resource.AddWorkshop` / FastDL (Icefuse-style hosted dedicated included). After a bad join, staff run `joinclinic_inspect <nick>` and paste the report into the support thread. The row names the Workshop ID or FastDL file.
+
+Owner checklist, load order, ULX/SAM/CAMI hooks: **[docs/OPS.md](docs/OPS.md)**.
 
 Optional: list critical models in `lua/join_clinic/config/critical_assets.lua` (keep the git copy empty; fill on the server) so a missing playermodel is a named asset, not a lucky ERROR.
 
-Server-specific ops notes stay in gitignored `local/` — do not commit collection IDs or staff SOPs.
+Server-specific SOPs and collection IDs stay in gitignored `local/` — do not commit them.
 
 ## How it works
 

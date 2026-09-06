@@ -8,6 +8,41 @@ function JoinClinic.GetReport(steamid64)
 	return last[steamid64]
 end
 
+local function camiAllows(ply, privilege)
+	if not CAMI or not CAMI.PlayerHasAccess then
+		return nil
+	end
+	local allowed = false
+	local answered = false
+	CAMI.PlayerHasAccess(ply, privilege, function(has)
+		answered = true
+		allowed = has and true or false
+	end)
+	-- CAMI may answer sync; if async, fall through to SuperAdmin.
+	if answered then
+		return allowed
+	end
+	return nil
+end
+
+function JoinClinic.CanNotifyStaff(ply)
+	if not IsValid(ply) then
+		return false
+	end
+	local hookResult = hook.Run("JoinClinic_CanNotifyStaff", ply)
+	if hookResult == true then
+		return true
+	end
+	if hookResult == false then
+		return false
+	end
+	local cami = camiAllows(ply, "JoinClinic_Notify")
+	if cami ~= nil then
+		return cami
+	end
+	return ply:IsSuperAdmin()
+end
+
 function JoinClinic.NotifyStaff(report)
 	if report.counts.bad < 1 then
 		return
@@ -22,7 +57,7 @@ function JoinClinic.NotifyStaff(report)
 	local i = 1
 	while players[i] do
 		local ply = players[i]
-		if ply:IsSuperAdmin() then
+		if JoinClinic.CanNotifyStaff(ply) then
 			ply:PrintMessage(HUD_PRINTTALK, line)
 		end
 		i = i + 1
@@ -82,14 +117,38 @@ local function resolveSid(arg)
 	return nil
 end
 
-local function canInspect(ply, target)
+function JoinClinic.CanInspect(ply, target)
 	if not IsValid(ply) then
 		return true
+	end
+	local hookResult = hook.Run("JoinClinic_CanInspect", ply, target)
+	if hookResult == true then
+		return true
+	end
+	if hookResult == false then
+		return false
+	end
+	local cami = camiAllows(ply, "JoinClinic_Inspect")
+	if cami ~= nil then
+		return cami
 	end
 	if ply:IsSuperAdmin() then
 		return true
 	end
-	return hook.Run("JoinClinic_CanInspect", ply, target) == true
+	return false
+end
+
+if CAMI and CAMI.RegisterPrivilege then
+	CAMI.RegisterPrivilege({
+		Name = "JoinClinic_Notify",
+		MinAccess = "superadmin",
+		Description = "Receive Join Clinic chat when a join has failures"
+	})
+	CAMI.RegisterPrivilege({
+		Name = "JoinClinic_Inspect",
+		MinAccess = "superadmin",
+		Description = "Run joinclinic_inspect on other players"
+	})
 end
 
 JoinClinic.RecvChunked(JoinClinic.NET_REPORT, function(raw, ply)
@@ -118,7 +177,7 @@ concommand.Add("joinclinic_inspect", function(ply, _, args)
 	local sid = resolveSid(arg)
 	local targetPly = sid and player.GetBySteamID64(sid) or nil
 	local target = IsValid(targetPly) and targetPly or (sid or arg)
-	if not canInspect(ply, target) then
+	if not JoinClinic.CanInspect(ply, target) then
 		if IsValid(ply) then
 			ply:PrintMessage(HUD_PRINTCONSOLE, "Join Clinic: not allowed")
 		end
