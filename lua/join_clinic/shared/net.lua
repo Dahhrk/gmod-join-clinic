@@ -1,4 +1,6 @@
 JoinClinic.CHUNK_SIZE = 60 * 1024
+-- Seconds between outbound chunks so large transfers do not flood one tick.
+JoinClinic.CHUNK_GAP = 0.05
 
 local NET_EXPECTED = "joinclinic_expected"
 local NET_REPORT = "joinclinic_report"
@@ -45,6 +47,24 @@ local function dropStale(prefix, keep)
 	end
 end
 
+local function writeChunk(netName, xfer, idx, chunks, part, ply)
+	net.Start(netName)
+	net.WriteUInt(xfer, 32)
+	net.WriteUInt(idx, 16)
+	net.WriteUInt(chunks, 16)
+	net.WriteUInt(#part, 16)
+	-- LZMA bytes can contain NUL. WriteString would cut the chunk short.
+	net.WriteData(part, #part)
+	if SERVER then
+		if not IsValid(ply) then
+			return
+		end
+		net.Send(ply)
+	else
+		net.SendToServer()
+	end
+end
+
 function JoinClinic.SendChunked(netName, tbl, ply)
 	local json = util.TableToJSON(tbl)
 	if not json then
@@ -65,21 +85,22 @@ function JoinClinic.SendChunked(netName, tbl, ply)
 	end
 	xferSeq = xferSeq + 1
 	local xfer = xferSeq
+	local gap = tonumber(JoinClinic.CHUNK_GAP) or 0.05
+	if gap < 0 then
+		gap = 0
+	end
 	local i = 1
 	while i <= chunks do
 		local startAt = (i - 1) * size + 1
 		local part = string.sub(payload, startAt, startAt + size - 1)
-		net.Start(netName)
-		net.WriteUInt(xfer, 32)
-		net.WriteUInt(i, 16)
-		net.WriteUInt(chunks, 16)
-		net.WriteUInt(#part, 16)
-		-- LZMA bytes can contain NUL. WriteString would cut the chunk short.
-		net.WriteData(part, #part)
-		if SERVER then
-			net.Send(ply)
+		local idx = i
+		local delay = (i - 1) * gap
+		if delay <= 0 then
+			writeChunk(netName, xfer, idx, chunks, part, ply)
 		else
-			net.SendToServer()
+			timer.Simple(delay, function()
+				writeChunk(netName, xfer, idx, chunks, part, ply)
+			end)
 		end
 		i = i + 1
 	end

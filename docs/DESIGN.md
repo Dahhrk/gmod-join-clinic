@@ -39,7 +39,7 @@ JoinReport
 
 ## Net
 
-Expected list and reports go as compressed JSON, chunked at 60 KB. GMod's per-message cap is 65,533 bytes. Large collections are large enough to hit it.
+Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are spaced by `JoinClinic.CHUNK_GAP` (default 0.05s) so large collections do not flood one tick. GMod's per-message cap is 65,533 bytes.
 
 ## Surfaces
 
