@@ -6,6 +6,9 @@ function JoinClinic.AddExpected(kind, id, label)
 	end
 	JoinClinic.AssertKind(kind)
 	id = tostring(id)
+	if kind == "fastdl" or kind == "asset" then
+		id = string.gsub(id, "\\", "/")
+	end
 	local key = JoinClinic.ExpectedKey(kind, id)
 	local existing = expected[key]
 	if existing then
@@ -23,6 +26,18 @@ end
 
 function JoinClinic.IngestCritical(rows)
 	if type(rows) ~= "table" then
+		return
+	end
+	-- Single-row map form: { kind = "...", id = "..." }
+	if rows.kind ~= nil or rows.id ~= nil then
+		local ok, err = pcall(JoinClinic.AddExpected, rows.kind, rows.id, rows.label)
+		if not ok then
+			ErrorNoHalt("[JoinClinic] critical_assets: " .. tostring(err) .. "\n")
+		end
+		return
+	end
+	if rows[1] == nil and next(rows) ~= nil then
+		ErrorNoHalt("[JoinClinic] critical_assets must be an array of rows, not a string-keyed map\n")
 		return
 	end
 	local i = 1
@@ -116,6 +131,13 @@ end)
 
 local lastRequestAt = {}
 local REQUEST_COOLDOWN = 2
+
+hook.Add("PlayerDisconnected", "JoinClinicRequestCooldown", function(ply)
+	if not IsValid(ply) then
+		return
+	end
+	lastRequestAt[ply:SteamID64()] = nil
+end)
 
 net.Receive(JoinClinic.NET_REQUEST, function(_, ply)
 	if not IsValid(ply) then

@@ -20,6 +20,7 @@ if SERVER then
 end
 
 local buffers = {}
+local latestXfer = {}
 local xferSeq = 0
 local sendGens = {}
 local MAX_DECOMPRESS = 8 * 1024 * 1024
@@ -34,10 +35,10 @@ local function peerKey(ply)
 	return "local"
 end
 
-local function dropStale(prefix, keep)
+local function dropPrefix(prefix)
 	local stale = {}
 	for key in pairs(buffers) do
-		if key ~= keep and string.sub(key, 1, #prefix) == prefix then
+		if string.sub(key, 1, #prefix) == prefix then
 			stale[#stale + 1] = key
 		end
 	end
@@ -49,6 +50,9 @@ local function dropStale(prefix, keep)
 end
 
 local function writeChunk(netName, xfer, idx, chunks, part, ply)
+	if SERVER and not IsValid(ply) then
+		return
+	end
 	net.Start(netName)
 	net.WriteUInt(xfer, 32)
 	net.WriteUInt(idx, 16)
@@ -57,9 +61,6 @@ local function writeChunk(netName, xfer, idx, chunks, part, ply)
 	-- LZMA bytes can contain NUL. WriteString would cut the chunk short.
 	net.WriteData(part, #part)
 	if SERVER then
-		if not IsValid(ply) then
-			return
-		end
 		net.Send(ply)
 	else
 		net.SendToServer()
@@ -135,10 +136,18 @@ function JoinClinic.RecvChunked(netName, callback)
 			return
 		end
 		local prefix = netName .. "\0" .. peerKey(ply) .. "\0"
+		local prev = latestXfer[prefix]
+		if prev and xfer < prev then
+			-- Late chunk from a cancelled/superseded transfer.
+			return
+		end
+		if not prev or xfer > prev then
+			latestXfer[prefix] = xfer
+			dropPrefix(prefix)
+		end
 		local key = prefix .. tostring(xfer)
 		local slot = buffers[key]
 		if not slot then
-			dropStale(prefix, key)
 			slot = { n = 0, chunks = chunks, parts = {} }
 			buffers[key] = slot
 		elseif slot.chunks ~= chunks then

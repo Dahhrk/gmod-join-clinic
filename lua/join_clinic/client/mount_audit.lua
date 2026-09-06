@@ -28,21 +28,24 @@ local function fastdlUrl(base, path)
 	return base .. "/" .. path
 end
 
-local function findAddon(wsid)
-	wsid = tostring(wsid)
+local function gamePath(id)
+	return string.gsub(tostring(id), "\\", "/")
+end
+
+local function buildAddonIndex()
+	local byWsid = {}
 	local addons = engine.GetAddons()
 	local i = 1
 	while addons[i] do
-		if tostring(addons[i].wsid) == wsid then
-			return addons[i]
-		end
+		local addon = addons[i]
+		byWsid[tostring(addon.wsid)] = addon
 		i = i + 1
 	end
-	return nil
+	return byWsid
 end
 
-local function auditWorkshop(item)
-	local addon = findAddon(item.id)
+local function auditWorkshop(item, byWsid)
+	local addon = byWsid[tostring(item.id)]
 	if not addon then
 		return JoinClinic.MakeResult(item, "not_downloaded", "not in engine.GetAddons()")
 	end
@@ -58,11 +61,12 @@ local function auditWorkshop(item)
 end
 
 local function auditAsset(item)
-	if not file.Exists(item.id, "GAME") then
+	local path = gamePath(item.id)
+	if not file.Exists(path, "GAME") then
 		return JoinClinic.MakeResult(item, "missing", "GAME")
 	end
-	if JoinClinic.IsMaterialPath(item.id) then
-		local mat = Material(JoinClinic.MaterialName(item.id))
+	if JoinClinic.IsMaterialPath(path) then
+		local mat = Material(JoinClinic.MaterialName(path))
 		if not mat or mat:IsError() then
 			return JoinClinic.MakeResult(item, "error_texture", "Material:IsError")
 		end
@@ -105,6 +109,7 @@ local function runAudit(items)
 	local sent = false
 	local httpQueue = {}
 	local httpInflight = 0
+	local byWsid = buildAddonIndex()
 
 	local function trySend()
 		pending = pending - 1
@@ -126,7 +131,8 @@ local function runAudit(items)
 		end
 	end
 
-	local function probeFastdl(index, item, exists, base)
+	-- Only used when the file is missing locally. Never download a body we already have.
+	local function probeFastdl(index, item, base)
 		httpQueue[#httpQueue + 1] = function(done)
 			local left = 2
 			local finished = false
@@ -155,24 +161,15 @@ local function runAudit(items)
 				if left > 0 then
 					return
 				end
-				local detail = "GAME " .. (exists and "exists" or "missing") .. "; HTTP " .. table.concat(notes, " ")
+				local detail = "GAME missing; HTTP " .. table.concat(notes, " ")
 				if saw200 then
-					if exists then
-						finish("ok", detail)
-						return
-					end
 					finish("missing", detail)
-					return
-				end
-				-- Local file wins: FastDL probe failure is detail, not a miss.
-				if exists then
-					finish("ok", detail .. "; FastDL probe failed")
 					return
 				end
 				finish("http_fail", detail)
 			end
 
-			local url = fastdlUrl(base, item.id)
+			local url = fastdlUrl(base, gamePath(item.id))
 			local function fetch(u, label)
 				local ok = pcall(function()
 					http.Fetch(u, function(_, _, _, code)
@@ -188,22 +185,13 @@ local function runAudit(items)
 			fetch(url, "file")
 			fetch(url .. ".bz2", "bz2")
 
-			-- http.Fetch can stall without calling success or failure.
 			timer.Simple(HTTP_WAIT, function()
 				if finished then
 					return
 				end
-				local detail = "GAME " .. (exists and "exists" or "missing") .. "; HTTP " .. table.concat(notes, " ") .. " timeout"
+				local detail = "GAME missing; HTTP " .. table.concat(notes, " ") .. " timeout"
 				if saw200 then
-					if exists then
-						finish("ok", detail)
-						return
-					end
 					finish("missing", detail)
-					return
-				end
-				if exists then
-					finish("ok", detail .. "; FastDL probe failed")
 					return
 				end
 				finish("http_fail", detail)
@@ -219,17 +207,20 @@ local function runAudit(items)
 			local item = JoinClinic.ParseExpectedItem(items[index])
 			local kind = item.kind
 			if kind == "workshop" then
-				results[index] = auditWorkshop(item)
+				results[index] = auditWorkshop(item, byWsid)
 			elseif kind == "fastdl" then
-				local exists = file.Exists(item.id, "GAME")
-				local probe, base = shouldHttp()
-				if probe then
-					pending = pending + 1
-					probeFastdl(index, item, exists, base)
-				elseif exists then
+				local path = gamePath(item.id)
+				local exists = file.Exists(path, "GAME")
+				if exists then
 					results[index] = JoinClinic.MakeResult(item, "ok", "GAME")
 				else
-					results[index] = JoinClinic.MakeResult(item, "missing", "GAME")
+					local probe, base = shouldHttp()
+					if probe then
+						pending = pending + 1
+						probeFastdl(index, item, base)
+					else
+						results[index] = JoinClinic.MakeResult(item, "missing", "GAME")
+					end
 				end
 			elseif kind == "asset" then
 				results[index] = auditAsset(item)
@@ -281,4 +272,14 @@ hook.Add("InitPostEntity", "JoinClinic", function()
 	JoinClinic.ClientReady = true
 	JoinClinic.Started = os.time()
 	requestExpected()
+	timer.Simple(5, function()
+		if not JoinClinic.LastReport then
+			requestExpected()
+		end
+	end)
+	timer.Simple(12, function()
+		if not JoinClinic.LastReport then
+			requestExpected()
+		end
+	end)
 end)
