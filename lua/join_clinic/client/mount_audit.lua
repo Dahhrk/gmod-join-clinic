@@ -43,14 +43,14 @@ end
 
 local function auditWorkshop(item)
 	local addon = findAddon(item.id)
-	local downloaded = addon and addon.downloaded ~= false and addon.downloaded ~= 0
-	if not downloaded then
-		local detail = "not in engine.GetAddons()"
-		if addon then
-			detail = "downloaded=false"
-		end
-		return JoinClinic.MakeResult(item, "not_downloaded", detail)
+	if not addon then
+		return JoinClinic.MakeResult(item, "not_downloaded", "not in engine.GetAddons()")
 	end
+	-- Require an explicit downloaded flag. nil is not success.
+	if addon.downloaded ~= true and addon.downloaded ~= 1 then
+		return JoinClinic.MakeResult(item, "not_downloaded", "downloaded=" .. tostring(addon.downloaded))
+	end
+	-- mounted nil stays ok (GMod sometimes omits the field when mounted).
 	if addon.mounted == false or addon.mounted == 0 then
 		return JoinClinic.MakeResult(item, "not_mounted", "downloaded, not mounted")
 	end

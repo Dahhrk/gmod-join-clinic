@@ -19,6 +19,7 @@ end
 
 local buffers = {}
 local xferSeq = 0
+local MAX_DECOMPRESS = 8 * 1024 * 1024
 
 local function peerKey(ply)
 	if SERVER then
@@ -58,6 +59,10 @@ function JoinClinic.SendChunked(netName, tbl, ply)
 	if chunks < 1 then
 		chunks = 1
 	end
+	local maxChunks = math.ceil(MAX_DECOMPRESS / size)
+	if chunks > maxChunks then
+		error("JoinClinic: payload exceeds decompress budget (" .. tostring(#payload) .. " bytes)")
+	end
 	xferSeq = xferSeq + 1
 	local xfer = xferSeq
 	local i = 1
@@ -81,12 +86,25 @@ function JoinClinic.SendChunked(netName, tbl, ply)
 end
 
 function JoinClinic.RecvChunked(netName, callback)
+	local maxChunks = math.ceil(MAX_DECOMPRESS / JoinClinic.CHUNK_SIZE)
 	net.Receive(netName, function(_, ply)
 		local xfer = net.ReadUInt(32)
 		local idx = net.ReadUInt(16)
 		local chunks = net.ReadUInt(16)
 		local partLen = net.ReadUInt(16)
 		local part = net.ReadData(partLen)
+		if chunks < 1 or chunks > maxChunks then
+			ErrorNoHalt("[JoinClinic] bad chunk count " .. tostring(chunks) .. "\n")
+			return
+		end
+		if idx < 1 or idx > chunks then
+			ErrorNoHalt("[JoinClinic] bad chunk index " .. tostring(idx) .. "/" .. tostring(chunks) .. "\n")
+			return
+		end
+		if partLen ~= #part then
+			ErrorNoHalt("[JoinClinic] chunk length mismatch\n")
+			return
+		end
 		local prefix = netName .. "\0" .. peerKey(ply) .. "\0"
 		local key = prefix .. tostring(xfer)
 		local slot = buffers[key]
@@ -94,6 +112,10 @@ function JoinClinic.RecvChunked(netName, callback)
 			dropStale(prefix, key)
 			slot = { n = 0, chunks = chunks, parts = {} }
 			buffers[key] = slot
+		elseif slot.chunks ~= chunks then
+			ErrorNoHalt("[JoinClinic] chunk count changed mid-transfer\n")
+			buffers[key] = nil
+			return
 		end
 		if not slot.parts[idx] then
 			slot.parts[idx] = part
@@ -105,11 +127,16 @@ function JoinClinic.RecvChunked(netName, callback)
 		local pieces = {}
 		local i = 1
 		while i <= slot.chunks do
-			pieces[i] = slot.parts[i] or ""
+			if slot.parts[i] == nil then
+				ErrorNoHalt("[JoinClinic] missing chunk " .. tostring(i) .. "\n")
+				buffers[key] = nil
+				return
+			end
+			pieces[i] = slot.parts[i]
 			i = i + 1
 		end
 		buffers[key] = nil
-		local json = util.Decompress(table.concat(pieces), 8 * 1024 * 1024)
+		local json = util.Decompress(table.concat(pieces), MAX_DECOMPRESS)
 		if not json or json == "" then
 			ErrorNoHalt("[JoinClinic] Decompress failed\n")
 			return

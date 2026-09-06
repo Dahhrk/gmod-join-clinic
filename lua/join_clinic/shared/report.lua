@@ -113,7 +113,10 @@ function JoinClinic.ParseJoinReport(raw)
 	end
 	local results = {}
 	local i = 1
-	while src[i] ~= nil and i <= 8192 do
+	while src[i] ~= nil do
+		if i > 8192 then
+			error("JoinClinic: JoinReport.results exceeds 8192 rows")
+		end
 		results[i] = JoinClinic.ParseItemResult(src[i])
 		i = i + 1
 	end
