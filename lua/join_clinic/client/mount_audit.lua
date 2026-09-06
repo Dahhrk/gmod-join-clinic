@@ -73,6 +73,10 @@ end
 
 function JoinClinic.SendOwnReport(results)
 	local ply = LocalPlayer()
+	if not IsValid(ply) then
+		ErrorNoHalt("[JoinClinic] SendOwnReport without LocalPlayer\n")
+		return
+	end
 	local report = {
 		steamid64 = ply:SteamID64(),
 		nick = ply:Nick(),
@@ -152,15 +156,20 @@ local function runAudit(items)
 					return
 				end
 				local detail = "GAME " .. (exists and "exists" or "missing") .. "; HTTP " .. table.concat(notes, " ")
-				if not saw200 then
-					finish("http_fail", detail)
+				if saw200 then
+					if exists then
+						finish("ok", detail)
+						return
+					end
+					finish("missing", detail)
 					return
 				end
+				-- Local file wins: FastDL probe failure is detail, not a miss.
 				if exists then
-					finish("ok", detail)
+					finish("ok", detail .. "; FastDL probe failed")
 					return
 				end
-				finish("missing", detail)
+				finish("http_fail", detail)
 			end
 
 			local url = fastdlUrl(base, item.id)
@@ -193,6 +202,10 @@ local function runAudit(items)
 					finish("missing", detail)
 					return
 				end
+				if exists then
+					finish("ok", detail .. "; FastDL probe failed")
+					return
+				end
 				finish("http_fail", detail)
 			end)
 		end
@@ -201,25 +214,35 @@ local function runAudit(items)
 
 	local i = 1
 	while i <= n do
-		local item = JoinClinic.ParseExpectedItem(items[i])
-		local kind = item.kind
-		if kind == "workshop" then
-			results[i] = auditWorkshop(item)
-		elseif kind == "fastdl" then
-			local exists = file.Exists(item.id, "GAME")
-			local probe, base = shouldHttp()
-			if probe then
-				pending = pending + 1
-				probeFastdl(i, item, exists, base)
-			elseif exists then
-				results[i] = JoinClinic.MakeResult(item, "ok", "GAME")
+		local index = i
+		local ok, err = pcall(function()
+			local item = JoinClinic.ParseExpectedItem(items[index])
+			local kind = item.kind
+			if kind == "workshop" then
+				results[index] = auditWorkshop(item)
+			elseif kind == "fastdl" then
+				local exists = file.Exists(item.id, "GAME")
+				local probe, base = shouldHttp()
+				if probe then
+					pending = pending + 1
+					probeFastdl(index, item, exists, base)
+				elseif exists then
+					results[index] = JoinClinic.MakeResult(item, "ok", "GAME")
+				else
+					results[index] = JoinClinic.MakeResult(item, "missing", "GAME")
+				end
+			elseif kind == "asset" then
+				results[index] = auditAsset(item)
 			else
-				results[i] = JoinClinic.MakeResult(item, "missing", "GAME")
+				error("JoinClinic: unknown kind " .. tostring(kind))
 			end
-		elseif kind == "asset" then
-			results[i] = auditAsset(item)
-		else
-			error("JoinClinic: unknown kind " .. tostring(kind))
+		end)
+		if not ok then
+			ErrorNoHalt("[JoinClinic] audit row " .. tostring(index) .. ": " .. tostring(err) .. "\n")
+			results[index] = JoinClinic.MakeResult({
+				kind = "asset",
+				id = "invalid_row_" .. tostring(index)
+			}, "missing", tostring(err))
 		end
 		i = i + 1
 	end
@@ -240,6 +263,10 @@ JoinClinic.RecvChunked(JoinClinic.NET_EXPECTED, function(raw)
 	if type(raw) == "table" and type(raw.items) == "table" then
 		local i = 1
 		while raw.items[i] ~= nil do
+			if i > 8192 then
+				ErrorNoHalt("[JoinClinic] expected list exceeds 8192; truncating audit\n")
+				break
+			end
 			items[i] = raw.items[i]
 			i = i + 1
 		end

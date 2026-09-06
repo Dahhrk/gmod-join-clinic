@@ -21,6 +21,7 @@ end
 
 local buffers = {}
 local xferSeq = 0
+local sendGens = {}
 local MAX_DECOMPRESS = 8 * 1024 * 1024
 
 local function peerKey(ply)
@@ -85,6 +86,9 @@ function JoinClinic.SendChunked(netName, tbl, ply)
 	end
 	xferSeq = xferSeq + 1
 	local xfer = xferSeq
+	local genKey = netName .. "\0" .. peerKey(ply)
+	local gen = (sendGens[genKey] or 0) + 1
+	sendGens[genKey] = gen
 	local gap = tonumber(JoinClinic.CHUNK_GAP) or 0.05
 	if gap < 0 then
 		gap = 0
@@ -95,12 +99,16 @@ function JoinClinic.SendChunked(netName, tbl, ply)
 		local part = string.sub(payload, startAt, startAt + size - 1)
 		local idx = i
 		local delay = (i - 1) * gap
-		if delay <= 0 then
+		local function fire()
+			if sendGens[genKey] ~= gen then
+				return
+			end
 			writeChunk(netName, xfer, idx, chunks, part, ply)
+		end
+		if delay <= 0 then
+			fire()
 		else
-			timer.Simple(delay, function()
-				writeChunk(netName, xfer, idx, chunks, part, ply)
-			end)
+			timer.Simple(delay, fire)
 		end
 		i = i + 1
 	end
@@ -167,6 +175,9 @@ function JoinClinic.RecvChunked(netName, callback)
 			ErrorNoHalt("[JoinClinic] JSONToTable failed\n")
 			return
 		end
-		callback(tbl, ply)
+		local ok, err = pcall(callback, tbl, ply)
+		if not ok then
+			ErrorNoHalt("[JoinClinic] " .. tostring(err) .. "\n")
+		end
 	end)
 end

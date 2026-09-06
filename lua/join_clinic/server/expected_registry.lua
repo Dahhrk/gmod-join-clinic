@@ -36,7 +36,10 @@ function JoinClinic.IngestCritical(rows)
 			id = row[2]
 			label = row[3]
 		end
-		JoinClinic.AddExpected(kind, id, label)
+		local ok, err = pcall(JoinClinic.AddExpected, kind, id, label)
+		if not ok then
+			ErrorNoHalt("[JoinClinic] critical_assets row " .. tostring(i) .. ": " .. tostring(err) .. "\n")
+		end
 		i = i + 1
 	end
 end
@@ -56,7 +59,14 @@ function JoinClinic.ListExpected()
 end
 
 function JoinClinic.SendExpected(ply)
-	JoinClinic.SendChunked(JoinClinic.NET_EXPECTED, { items = JoinClinic.ListExpected() }, ply)
+	local list = JoinClinic.ListExpected()
+	if #list > 8192 then
+		ErrorNoHalt("[JoinClinic] expected registry has " .. tostring(#list) .. " rows; sending first 8192\n")
+		while #list > 8192 do
+			list[#list] = nil
+		end
+	end
+	JoinClinic.SendChunked(JoinClinic.NET_EXPECTED, { items = list }, ply)
 end
 
 local addWorkshop = resource.AddWorkshop

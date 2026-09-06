@@ -39,7 +39,7 @@ JoinReport
 
 ## Net
 
-Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are spaced by `JoinClinic.CHUNK_GAP` (default 0.05s) so large collections do not flood one tick. GMod's per-message cap is 65,533 bytes.
+Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are spaced by `JoinClinic.CHUNK_GAP` (default 0.05s) so large collections do not flood one tick. A newer send on the same channel cancels in-flight staggered chunks. GMod's per-message cap is 65,533 bytes. Registry and report rows hard-cap at 8192 (error or truncate with a console warning — never silent crop of a stored report).
 
 ## Surfaces
 
@@ -50,7 +50,7 @@ Expected list and reports go as compressed JSON, chunked at 60 KB. Chunks are sp
 ## Layout
 
 ```
-lua/autorun/join_clinic.lua            -- AddCSLuaFile + includes only
+lua/autorun/aaa_join_clinic.lua        -- early boot across addons (aaa_*); AddCSLuaFile + includes only
 lua/join_clinic/
   shared/report.lua                    -- JoinReport shape + helpers
   shared/net.lua                       -- chunked JSON net

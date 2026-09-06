@@ -82,7 +82,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the `JoinReport` shape and why probe-on
 ## Repo layout
 
 ```
-lua/autorun/join_clinic.lua            -- boot (AddCSLuaFile + includes)
+lua/autorun/aaa_join_clinic.lua        -- early boot (aaa_* sorts before other autorun files)
 lua/join_clinic/
   shared/   report.lua, net.lua
   server/   expected_registry.lua, report_store.lua
