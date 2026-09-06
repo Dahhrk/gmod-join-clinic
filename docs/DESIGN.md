@@ -47,6 +47,22 @@ Expected list and reports go as compressed JSON, chunked at 60 KB. GMod's per-me
 - Staff: `joinclinic_inspect <name|steamid>`
 - Console: last report printed as copyable text
 
+## Layout
+
+```
+lua/autorun/aaa_join_clinic_init.lua   -- AddCSLuaFile + includes only
+lua/join_clinic/
+  shared/report.lua                    -- JoinReport shape + helpers
+  shared/net.lua                       -- chunked JSON net
+  server/expected_registry.lua         -- wraps resource.Add*
+  server/report_store.lua              -- last report per SteamID64
+  client/mount_audit.lua               -- engine.GetAddons / file / Material
+  client/panel.lua                     -- player + staff UI
+  config/critical_assets.lua           -- empty {} in git; ops fill locally
+```
+
+Commands stay `joinclinic_*`. Global table stays `JoinClinic`.
+
 ## Out of scope
 
 Reloader, EPOE rewrite, entity budget, job editor, admin sit, debugger.

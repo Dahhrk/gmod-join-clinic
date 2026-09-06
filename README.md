@@ -42,7 +42,7 @@ Workshop upload: pack with [gmpublisher](https://github.com/WilliamVenner/gmpubl
 
 Drop this addon on any server that already uses `resource.AddWorkshop` / FastDL. After a bad join, staff run `joinclinic_inspect <nick>` and paste the report into the support thread. The row names the Workshop ID or FastDL file.
 
-Optional: list regiment-critical models in `lua/joinclinic/critical.lua` (keep the git copy empty; fill on the server) so a missing playermodel is a named asset, not a lucky ERROR.
+Optional: list critical models in `lua/join_clinic/config/critical_assets.lua` (keep the git copy empty; fill on the server) so a missing playermodel is a named asset, not a lucky ERROR.
 
 Server-specific ops notes stay in gitignored `local/` — do not commit collection IDs or staff SOPs.
 
@@ -60,7 +60,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the `JoinReport` shape and why probe-on
 | `joinclinic_staff_notify` | `1` | Server. Print a one-line miss to SuperAdmins. |
 | `joinclinic_http` | `1` | Client. Probe `sv_downloadurl` for FastDL items. |
 
-`lua/joinclinic/critical.lua` is a table of extra `asset` items owners care about (playermodels, HUD materials). Workshop IDs do not belong there. Those come from `resource.AddWorkshop`.
+`lua/join_clinic/config/critical_assets.lua` returns extra `asset` rows (playermodels, HUD materials). Workshop IDs do not belong there — those come from `resource.AddWorkshop`.
 
 ## Commands
 
@@ -77,18 +77,22 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the `JoinReport` shape and why probe-on
 - `resource.Add*` shares an 8192-file download list with the engine. If you are over that, the clinic will show the overflow as missing. Cut the collection.
 - `file.Write` cannot fix `addons/`. This addon does not download content. It names the hole.
 - FastDL HTTP probes fail if `sv_downloadurl` is empty, private, or blocks the client.
-- `engine.GetAddons()` does not list folder addons. Folder content is checked only via `critical.lua` paths.
+- `engine.GetAddons()` does not list folder addons. Folder content is checked only via `critical_assets.lua` paths.
 
 ## Repo layout
 
 ```
-lua/autorun/aaa_joinclinic_init.lua
-lua/joinclinic/          -- domain, net, audit, UI
-docs/DESIGN.md           -- JoinReport shape
+lua/autorun/aaa_join_clinic_init.lua   -- early boot (aaa_* load order)
+lua/join_clinic/
+  shared/   report.lua, net.lua
+  server/   expected_registry.lua, report_store.lua
+  client/   mount_audit.lua, panel.lua
+  config/   critical_assets.lua        -- empty {} in git
+docs/DESIGN.md
 addon.json
 ```
 
-Agent / CI kit (`.cursor/`, `tools/`, `AGENTS.md`, …) stays local and is gitignored.
+Player-facing commands stay `joinclinic_*`. Agent kit (`.cursor/`, `tools/`, …) is local-only / gitignored.
 
 ## Development
 
