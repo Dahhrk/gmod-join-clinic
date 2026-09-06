@@ -98,6 +98,15 @@ Player-facing commands stay `joinclinic_*`. Agent kit (`.cursor/`, `tools/`, …
 
 Requires a Garry's Mod client and a listen or dedicated server. There is no headless test for mount state.
 
+Author machine (gitignored eyes):
+
+```powershell
+powershell -File tools/control-joinclinic.ps1 doctor
+powershell -File tools/control-joinclinic.ps1 fail-smoke
+```
+
+After a real join (unsubscribe one Workshop addon → `not_downloaded`), fill `local/JOIN_PROOF.md` from the template, then `join-proof`.
+
 1. Symlink or copy this folder into `garrysmod/addons/`.
 2. `joinclinic_expected` after your workshop Lua runs. Confirm IDs you expect.
 3. Unsubscribe one addon, rejoin, confirm `not_downloaded`.
